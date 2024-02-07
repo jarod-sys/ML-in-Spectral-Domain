@@ -79,7 +79,7 @@ class SpectralConv2D_one(Layer):
             self.SM_kernel = tf.constant(np.random.random((self.filters, self.kernel_size * self.kernel_size)),
                                          dtype="float32")
 
-            # Lambda_in
+        # Lambda_in
         self.Lambda_in = tf.Variable(np.ones((1, self.Right_shape[0] * self.Right_shape[1])),
                                      trainable=self.use_lambda_in,
                                      name='Lambda_out',
@@ -164,6 +164,9 @@ class SpectralConv2D_one(Layer):
             pass
 
         return outputs
+
+    def get_omega(self,*args):
+        return tf.reshape(self.SM_kernel, shape=(self.filters,self.kernel_size, self.kernel_size))
 
     def get_kernel(self, *args):
         kernel = tf.repeat(self.SM_kernel, repeats=self.output_lenght, axis=0, name=None)

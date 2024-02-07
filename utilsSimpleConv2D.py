@@ -89,3 +89,24 @@ def build_matrix_padding(input_shape: Tuple, pad: int):
     matrix = tf.concat([matrix, block1], 0)
     assert matrix.shape == (height_matrix_padding, width_matrix_padding)
     return matrix
+
+def convolution_at(img: np.ndarray,kernel: np.ndarray,i:int,j:int)->float:
+    output = 0
+    kernel_shape:Tuple =kernel.shape
+    img_shape: Tuple = img.shape
+    center_point:int =math.floor((kernel_shape[0]-1)/2)
+    height=i-center_point
+    width=j-center_point
+    for s in range(height,i+center_point+1):
+        for r in range(width, j+ center_point+1):
+            if (s<0 or s>img_shape[0]-1 or r>img_shape[1]-1 or r<0):continue
+            output+=img[s,r]*kernel[s-height,r-width]
+    return output
+
+def convolution(img: np.ndarray,kernel: np.ndarray)->np.ndarray:
+    img_shape:Tuple =img.shape
+    output =np.zeros(shape=img_shape,dtype="float32")
+    for i in range(img_shape[0]):
+        for j in range(img_shape[1]):
+            output[i,j]=convolution_at(img=img,kernel=kernel,i=i,j=j)
+    return output
