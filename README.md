@@ -1,1 +1,1 @@
-# ML-in-Spectral-Domain
+# Machine-Learning-in-Spectral-Domain
