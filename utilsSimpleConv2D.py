@@ -7,7 +7,33 @@ from typing import Tuple,List,Any,Dict
 from tensorflow.python.keras import activations, initializers, regularizers, constraints
 
 def shift_(weight:tf.Tensor, strides: int):
-    return  tf.roll(weight, shift=strides, axis=1) 
+    return  tf.roll(weight, shift=strides, axis=1)
+
+
+def indices_phi(filters: int, N: int, M: int, F: int = 3, S: int = 1, *args):
+    indices: List[Tuple] = list()
+
+    out_shape1: int = math.floor((N - F) / S) + 1
+    out_shape2: int = math.floor((M - F) / S) + 1
+    output_lenght: int = out_shape1 * out_shape2
+
+    for filter in range(filters):
+        count: int = 1
+        shift: int = 0
+        for i in range(output_lenght):
+            if i == count * (out_shape2):
+                count += 1
+                shift += F + (S - 1) * M
+            else:
+                if shift:
+                    shift += S
+                else:
+                    shift += 1
+            for block in range(F):
+                for j in range(F):
+                    indices.append((filter, i, block * M + shift - 1 + j))
+    return indices
+
 
 def build_matrix_strides(out_shape,strides):
 
