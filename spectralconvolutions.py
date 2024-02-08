@@ -107,6 +107,7 @@ class SpectralConv2D_one(Layer):
         # ---------------------------------------------------------------------------------------
         self.build = True
         # ---------------------------------------------------------------------------------------
+    
 
     def set_indices_phi(self, *args):
         self.indices: List[Tuple] = list()
@@ -244,8 +245,9 @@ class SpectralConv2D_two(Layer):
         # -------------------------------------------------------------------------------------
 
         # noyau_of_phi
-        self.noyau_of_phi = tf.constant(np.random.random((self.filters, self.kernel_size * self.kernel_size)),
-                                        dtype="float32")
+        self.noyau_of_phi = tf.constant(np.random.random((self.filters,
+                                                          self.kernel_size * self.kernel_size)),
+                                                          dtype="float32")
         # -------------------------------------------------------------------------------------
 
         # Lambda_in
@@ -274,7 +276,7 @@ class SpectralConv2D_two(Layer):
         # ---------------------------------------------------------------------------------------
         self.build = True
         # ---------------------------------------------------------------------------------------
-
+    
     def set_indices_phi(self, *args):
         self.indices: List[Tuple] = list()
 
@@ -332,6 +334,7 @@ class SpectralConv2D_two(Layer):
             pass
 
         return outputs
+
 
     def get_kernel(self, *args):
         kernel = tf.repeat(self.noyau_of_phi, repeats=self.output_lenght, axis=0, name=None)

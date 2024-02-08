@@ -107,7 +107,7 @@ class SpectralConv2D_one(Layer):
         # ---------------------------------------------------------------------------------------
         self.build = True
         # ---------------------------------------------------------------------------------------
-
+    @tf.function
     def set_indices_phi(self, *args):
         self.indices: List[Tuple] = list()
 
@@ -244,8 +244,9 @@ class SpectralConv2D_two(Layer):
         # -------------------------------------------------------------------------------------
 
         # noyau_of_phi
-        self.noyau_of_phi = tf.constant(np.random.random((self.filters, self.kernel_size * self.kernel_size)),
-                                        dtype="float32")
+        self.noyau_of_phi = tf.constant(np.random.random((self.filters,
+                                                          self.kernel_size * self.kernel_size)),
+                                                          dtype="float32")
         # -------------------------------------------------------------------------------------
 
         # Lambda_in
@@ -274,7 +275,8 @@ class SpectralConv2D_two(Layer):
         # ---------------------------------------------------------------------------------------
         self.build = True
         # ---------------------------------------------------------------------------------------
-
+    
+    @tf.function
     def set_indices_phi(self, *args):
         self.indices: List[Tuple] = list()
 
@@ -297,7 +299,7 @@ class SpectralConv2D_two(Layer):
                 for block in range(self.kernel_size):
                     for j in range(self.kernel_size):
                         self.indices.append((filters, i, block * self.Right_shape[1] + shift - 1 + j))
-
+    @tf.function
     def get_indices_phi(self, *args):
         return self.indices
 
@@ -333,6 +335,7 @@ class SpectralConv2D_two(Layer):
 
         return outputs
 
+    @tf.function
     def get_kernel(self, *args):
         kernel = tf.repeat(self.noyau_of_phi, repeats=self.output_lenght, axis=0, name=None)
         kernel = tf.reshape(kernel, shape=(-1, self.filters * self.output_lenght * self.kernel_size * self.kernel_size))
