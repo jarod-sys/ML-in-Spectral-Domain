@@ -80,19 +80,29 @@ class SpectralConv2D_one(Layer):
                                          dtype="float32")
 
         # Lambda_in
-        self.Lambda_in =self.add_weight(name='Lambda_in',
+        if self.use_lambda_in:
+            self.Lambda_in =self.add_weight(name='Lambda_in',
                                         shape=(1, self.Right_shape[0] * self.Right_shape[1]),
                                         initializer=tf.ones_initializer(),
                                         dtype=tf.float32,
                                         trainable=self.use_lambda_in)
+        else:
+            self.Lambda_in = tf.constant(np.ones((1, self.Right_shape[0] * self.Right_shape[1])),
+                                         dtype="float32")
+            
         
         # Lambda_out
-        self.Lambda_out =self.add_weight(name='Lambda_out',
-                                        shape=(self.output_lenght, 1),
-                                        initializer=tf.zeros_initializer(),
-                                        dtype=tf.float32,
-                                        trainable=self.use_lambda_out)
+        if self.use_lambda_out:
+            self.Lambda_out=self.add_weight(name='Lambda_out',
+                                            shape=(self.output_lenght, 1),
+                                            initializer=tf.zeros_initializer(),
+                                            dtype=tf.float32,
+                                            trainable=self.use_lambda_out)
 
+        else:
+            self.Lambda_out = tf.constant(np.zeros((self.output_lenght, 1)),
+                                         dtype="float32")
+            
         # --------------------------------------------bias---------------------------------------
         if self.use_bias:
             self.bias = self.add_weight(
