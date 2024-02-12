@@ -270,13 +270,16 @@ class SpectralConv2D_two(Layer):
                                                 self.kernel_size * self.kernel_size)),
                                                 dtype="float32")
         # -------------------------------------------------------------------------------------
+        # kernel
+        self.set_kernel()
+        
 
         # Lambda_in
         if self.use_lambda_in:
             self.Lambda_in = self.add_weight(
                 name='Lambda_in',
                 shape=(1, self.J2.shape[0]* self.J1.shape[1]),
-                initializer=tf.ones_initializer(),
+                initializer=self.initializer,
                 dtype=tf.float32,
                 trainable=self.use_lambda_in)
 
@@ -355,33 +358,20 @@ class SpectralConv2D_two(Layer):
 
     def call(self, inputs):
 
+        # -----------------------------------------------------------------------------------------------------
         flatten = tf.reshape(inputs, shape=(-1, inputs.shape[1] * inputs.shape[2], inputs.shape[3]))
         upFlatten = tf.matmul(a=self.matrix_pad, b=flatten)
         inputs_x=tf.reshape(upFlatten, shape=(-1, inputs.shape[3],self.Right_shape[0] , self.Right_shape[0]))
-
-        
         inputs_y=tf.matmul(a=self.J2,b=tf.matmul(a=inputs_x,b=self.J1))
         inputs_y=tf.reshape(inputs_y,shape=(-1, inputs_y.shape[2] * inputs_y.shape[3], inputs_y.shape[1]))
+        # -----------------------------------------------------------------------------------------------------
         
         # -----------------------------------------------------------------------------------------------------
-
-        kernel = tf.repeat(self.noyau_of_phi, repeats=self.output_lenght, axis=0, name=None)
-
-        kernel = tf.reshape(kernel, shape=(-1, self.filters * self.output_lenght * self.kernel_size * self.kernel_size))
-
-        kernel = tf.sparse.SparseTensor(
-            indices=self.indices, values=kernel[0],
-            dense_shape=(self.filters, self.output_lenght, self.J1.shape[1] * self.J2.shape[0])
-        )
-
-        kernel = tf.sparse.to_dense(kernel)
-        kernel = tf.linalg.matmul(kernel, tf.linalg.diag(self.Lambda_in[0, :], k=0))
+        outputs = tf.matmul(a=tf.linalg.matmul(self.kernel, tf.linalg.diag(self.Lambda_in[0, :], k=0)), b=inputs_y)
+        outputs = tf.reshape(outputs, shape=(-1, self.out_shape1, self.out_shape1, outputs.shape[2]))
         # -----------------------------------------------------------------------------------------------------
 
-        outputs = tf.matmul(a=kernel, b=inputs_y)
-
-        outputs = tf.reshape(outputs, shape=(-1, self.out_shape1, self.out_shape1, outputs.shape[2]))
-
+       
         if self.use_bias:
             outputs = tf.nn.bias_add(outputs, self.bias)
 
@@ -393,14 +383,15 @@ class SpectralConv2D_two(Layer):
         return outputs
 
 
-    def get_kernel(self, *args):
+    def set_kernel(self, *args):
         kernel = tf.repeat(self.noyau_of_phi, repeats=self.output_lenght, axis=0, name=None)
+        
         kernel = tf.reshape(kernel, shape=(-1, self.filters * self.output_lenght * self.kernel_size * self.kernel_size))
+        
         kernel = tf.sparse.SparseTensor(
-            indices=self.indices, values=kernel[0],
-            dense_shape=(self.filters, self.output_lenght, self.Right_shape[0] * self.Right_shape[1])
+        indices=self.indices, values=kernel[0],
+        dense_shape=(self.filters, self.output_lenght, self.J1.shape[1] * self.J2.shape[0])
         )
-        kernel = tf.sparse.to_dense(kernel)
-        kernel = tf.linalg.matmul(kernel, tf.linalg.diag(self.Lambda_in[0, :], k=0))
-        return kernel
+        
+        self.kernel = tf.sparse.to_dense(kernel)
 
