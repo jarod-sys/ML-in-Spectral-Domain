@@ -199,86 +199,55 @@ class SpectralConv2D_one(Layer):
             tf.linalg.diag(self.Lambda_out[:, 0], k=0), kernel)
         return kernel
 
-
-class SpectralConv2D_two(Layer):
+class SpecConv2D(Layer):
 
     def __init__(self, filters,
                  kernel_size=3,
-                 strides=1,
-                 padding='VALID',
                  use_lambda_in=True,
                  use_bias=False,
                  activation="relu"):
 
-        super(SpectralConv2D_two, self).__init__()
+        super(SpecConv2D, self).__init__()
 
         self.filters = filters
-        self.strides = strides
-        self.padding = padding
         self.use_bias = use_bias
-        self.use_lambda_in = use_lambda_in
-
         self.kernel_size = kernel_size
+        self.use_lambda_in = use_lambda_in
         self.activation = activations.get(activation)
+
+        
         self.initializer = initializers.RandomUniform(-1, 1)
 
     def build(self, input_shape):
         input_shape = tf.TensorShape(input_shape)
-        input_channel = input_shape[-1]
-        self.pad = math.floor((self.kernel_size - 1) / 2)
+        self.input_channel = input_shape[-1]
+        # ------------------------------out_in_shape_phi_indices---------------------------
+        self.set_indices_phi(N=input_shape[1],M=input_shape[2])
+        # -----------------------------------------------------------------------------------
     
-        # -----------------------------------------matrix_pad-----------------------------------------------
-        if self.padding == "SAME":
-            if self.strides > 1:
-                raise Exception("Not implemented: paddind=SAME and strides>1. if padding=SAME, strides=1")
-    
-            # Right_shape
-            self.Right_shape: Tuple = input_shape[1] + 2 * self.pad, input_shape[2] + 2 * self.pad
-            inputShape = input_shape[1], input_shape[2]
-            # matrix_pad
-            self.matrix_pad = build_matrix_padding(input_shape=inputShape, pad=self.pad)
-            # Jacobien_strides
-            self.Build_J()
-            # ------------------------------out_in_shape_phi_indices---------------------------
-            self.set_indices_phi(N=self.J2.shape[0],M=self.J1.shape[1])
-            # -----------------------------------------------------------------------------------
-    
-        elif self.padding == "VALID":
-            # Right_shape
-            self.Right_shape: Tuple = input_shape[1], input_shape[2]
-            # matrix_pad
-            self.matrix_pad = matrix = tf.constant(np.identity(input_shape[1] * input_shape[2]), dtype="float32")
-            
-            if self.strides>self.kernel_size:
-                raise Exception("Not implemented")
-            else:
-                # Jacobien_strides
-                self.Build_J()
-                # ------------------------------out_in_shape_phi_indices---------------------------
-                self.set_indices_phi(N=self.J2.shape[0],M=self.J1.shape[1])
-                # -----------------------------------------------------------------------------------
-            
-            
-    
-        else:
-            raise Exception("Padding not found")
-        # ------------------------------------------------------------------------------------
-
-        
-        # noyau_of_phi
+        # --------------------------------noyau_of_phi----------------------------------------
         self.noyau_of_phi = tf.constant(np.ones((self.filters,
                                                 self.kernel_size * self.kernel_size)),
                                                 dtype="float32")
-        # -------------------------------------------------------------------------------------
-        # kernel
-        self.set_kernel()
         
+        # -----------------------------------kernel-------------------------------------------
+        kernel = tf.repeat(self.noyau_of_phi, repeats=self.output_lenght, axis=0, name=None)
+        
+        kernel = tf.reshape(kernel, shape=(-1, self.filters * self.output_lenght * self.kernel_size * self.kernel_size))
+        
+        kernel = tf.sparse.SparseTensor(
+        indices=self.indices, values=kernel[0],
+        dense_shape=(self.filters, self.output_lenght, input_shape[1]*input_shape[2])
+        )
+        
+        self.kernel = tf.sparse.to_dense(kernel)
+        # -------------------------------------------------------------------------------------
 
         # Lambda_in
         if self.use_lambda_in:
             self.Lambda_in = self.add_weight(
                 name='Lambda_in',
-                shape=(1, self.J2.shape[0]* self.J1.shape[1]),
+                shape=(1, input_shape[1]*input_shape[2]),
                 initializer=self.initializer,
                 dtype=tf.float32,
                 trainable=self.use_lambda_in)
@@ -324,52 +293,22 @@ class SpectralConv2D_two(Layer):
                     for j in range(self.kernel_size):
                         self.indices.append((filters, i, block * M + shift - 1 + j))
 
-    def Build_J(self,*args):
-        out_shape1:int=math.floor((self.Right_shape[0]-self.kernel_size)/self.strides) + 1
-        out_shape2:int=math.floor((self.Right_shape[1]-self.kernel_size)/self.strides) + 1
-    
-        row = tf.Variable(np.zeros(shape=(self.Right_shape[1],1)), dtype=tf.float32, trainable=False)
-        row[0,0].assign(1)
-        for j in range(out_shape2):
-            for k in range(self.kernel_size):
-                try:
-                    new_line=shift_(row,k,axis=0)
-                    self.J1 = tf.concat([self.J1, new_line], 1)
-                except:
-                    self.J1 = row
-            row=shift_(row, self.strides,axis=0)
-            
-        del new_line
-        
-        col = tf.Variable(np.zeros(shape=(1,self.Right_shape[0])), dtype=tf.float32, trainable=False)
-        col[0,0].assign(1)
-        
-        for i in range(out_shape1):
-            for l in range(self.kernel_size):
-                try:
-                    new_line=shift_(col,l,axis=1)
-                    self.J2 = tf.concat([self.J2, new_line], 0)
-                except:
-                    self.J2 = col
-            col=shift_(col, self.strides,axis=1)
-
     def get_indices_phi(self, *args):
         return self.indices
 
     def call(self, inputs):
 
-        # -----------------------------------------------------------------------------------------------------
-        flatten = tf.reshape(inputs, shape=(-1, inputs.shape[1] * inputs.shape[2], inputs.shape[3]))
-        upFlatten = tf.matmul(a=self.matrix_pad, b=flatten)
-        inputs_x=tf.reshape(upFlatten, shape=(-1, inputs.shape[3],self.Right_shape[0] , self.Right_shape[0]))
-        inputs_y=tf.matmul(a=self.J2,b=tf.matmul(a=inputs_x,b=self.J1))
-        inputs_y=tf.reshape(inputs_y,shape=(-1, inputs_y.shape[2] * inputs_y.shape[3], inputs_y.shape[1]))
-        # -----------------------------------------------------------------------------------------------------
         
         # -----------------------------------------------------------------------------------------------------
-        outputs = tf.matmul(a=tf.linalg.matmul(self.kernel, tf.linalg.diag(self.Lambda_in[0, :], k=0)), b=inputs_y)
-        outputs = tf.reshape(outputs, shape=(-1, self.out_shape1, self.out_shape1, outputs.shape[2]))
+        flatten = tf.reshape(inputs, shape=(-1, inputs.shape[1] * inputs.shape[2], inputs.shape[3]))
         # -----------------------------------------------------------------------------------------------------
+        # -----------------------------------------------------------------------------------------------------
+        if 0<self.filters<2:
+            outputs = tf.matmul(a=tf.linalg.matmul(self.kernel, tf.linalg.diag(self.Lambda_in[0, :], k=0)), b=flatten)
+            outputs = tf.reshape(outputs, shape=(-1, self.out_shape1, self.out_shape2,self.input_channel))
+            # -----------------------------------------------------------------------------------------------------#
+        else:
+             raise Exception("Not implemented for this filter.")
 
        
         if self.use_bias:
@@ -383,15 +322,7 @@ class SpectralConv2D_two(Layer):
         return outputs
 
 
-    def set_kernel(self, *args):
-        kernel = tf.repeat(self.noyau_of_phi, repeats=self.output_lenght, axis=0, name=None)
+    def get_kernel(self, *args):
+        return self.kernel
         
-        kernel = tf.reshape(kernel, shape=(-1, self.filters * self.output_lenght * self.kernel_size * self.kernel_size))
-        
-        kernel = tf.sparse.SparseTensor(
-        indices=self.indices, values=kernel[0],
-        dense_shape=(self.filters, self.output_lenght, self.J1.shape[1] * self.J2.shape[0])
-        )
-        
-        self.kernel = tf.sparse.to_dense(kernel)
 
