@@ -198,3 +198,131 @@ class SpectralConv2D_one(Layer):
         kernel = tf.linalg.matmul(kernel, tf.linalg.diag(self.Lambda_in[0, :], k=0)) - tf.linalg.matmul(
             tf.linalg.diag(self.Lambda_out[:, 0], k=0), kernel)
         return kernel
+
+class SpecConv2D(Layer):
+
+    def __init__(self, filters,
+                 kernel_size=3,
+                 use_lambda_in=True,
+                 use_bias=False,
+                 activation="relu"):
+
+        super(SpecConv2D, self).__init__()
+
+        self.filters = filters
+        self.use_bias = use_bias
+        self.kernel_size = kernel_size
+        self.use_lambda_in = use_lambda_in
+        self.activation = activations.get(activation)
+
+        
+        self.initializer = initializers.RandomUniform(-1, 1)
+
+    def build(self, input_shape):
+        input_shape = tf.TensorShape(input_shape)
+        self.input_channel = input_shape[-1]
+        # ------------------------------out_in_shape_phi_indices---------------------------
+        self.set_indices_phi(N=input_shape[1],M=input_shape[2])
+        # -----------------------------------------------------------------------------------
+    
+        # --------------------------------noyau_of_phi----------------------------------------
+        self.noyau_of_phi = tf.constant(np.ones((self.filters,
+                                                self.kernel_size * self.kernel_size)),
+                                                dtype="float32")
+        
+        # -----------------------------------kernel-------------------------------------------
+        kernel = tf.repeat(self.noyau_of_phi, repeats=self.output_lenght, axis=0, name=None)
+        
+        kernel = tf.reshape(kernel, shape=(-1, self.filters * self.output_lenght * self.kernel_size * self.kernel_size))
+        
+        kernel = tf.sparse.SparseTensor(
+        indices=self.indices, values=kernel[0],
+        dense_shape=(self.filters, self.output_lenght, input_shape[1]*input_shape[2])
+        )
+        
+        self.kernel = tf.sparse.to_dense(kernel)
+        # -------------------------------------------------------------------------------------
+
+        # Lambda_in
+        if self.use_lambda_in:
+            self.Lambda_in = self.add_weight(
+                name='Lambda_in',
+                shape=(1, input_shape[1]*input_shape[2]),
+                initializer=self.initializer,
+                dtype=tf.float32,
+                trainable=self.use_lambda_in)
+
+        else:
+            raise Exception("Not implemented.")
+
+        # --------------------------------------------bias---------------------------------------
+        if self.use_bias:
+            self.bias = self.add_weight(
+                name='bias',
+                shape=(self.filters,),
+                dtype=tf.float32,
+                trainable=self.use_bias)
+        else:
+            self.bias = None
+        # ---------------------------------------------------------------------------------------
+
+        # ---------------------------------------------------------------------------------------
+        self.build = True
+        # ---------------------------------------------------------------------------------------
+    
+    def set_indices_phi(self,N:int,M:int, *args):
+        self.indices: List[Tuple] = list()
+    
+        self.out_shape1: int = math.floor((N - self.kernel_size) / self.kernel_size) + 1
+        self.out_shape2: int = math.floor((M - self.kernel_size) / self.kernel_size) + 1
+        self.output_lenght: int = self.out_shape1 * self.out_shape2
+    
+        for filters in range(self.filters):
+            count: int = 1
+            shift: int = 0
+            for i in range(self.output_lenght):
+                if i == count * (self.out_shape2):
+                    count += 1
+                    shift += self.kernel_size + (self.kernel_size - 1) * M
+                else:
+                    if shift:
+                        shift += self.kernel_size
+                    else:
+                        shift += 1
+                for block in range(self.kernel_size):
+                    for j in range(self.kernel_size):
+                        self.indices.append((filters, i, block * M + shift - 1 + j))
+
+    def get_indices_phi(self, *args):
+        return self.indices
+
+    def call(self, inputs):
+
+        
+        # -----------------------------------------------------------------------------------------------------
+        flatten = tf.reshape(inputs, shape=(-1, inputs.shape[1] * inputs.shape[2], inputs.shape[3]))
+        # -----------------------------------------------------------------------------------------------------
+        # -----------------------------------------------------------------------------------------------------
+        if 0<self.filters<2:
+            outputs = tf.matmul(a=tf.linalg.matmul(self.kernel, tf.linalg.diag(self.Lambda_in[0, :], k=0)), b=flatten)
+            outputs = tf.reshape(outputs, shape=(-1, self.out_shape1, self.out_shape2,self.input_channel))
+            # -----------------------------------------------------------------------------------------------------#
+        else:
+             raise Exception("Not implemented for this filter.")
+
+       
+        if self.use_bias:
+            outputs = tf.nn.bias_add(outputs, self.bias)
+
+        if self.activation is not None:
+            outputs = self.activation(outputs)
+        else:
+            pass
+
+        return outputs
+
+
+    def get_kernel(self, *args):
+        return self.kernel
+        
+

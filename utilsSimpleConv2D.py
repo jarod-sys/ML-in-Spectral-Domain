@@ -193,8 +193,9 @@ class PaddingJacobiens(Layer):
         out_shape1:int=math.floor((self.Right_shape[0]-self.kernel_size)/self.strides) + 1
         out_shape2:int=math.floor((self.Right_shape[1]-self.kernel_size)/self.strides) + 1
     
-        row = tf.Variable(np.zeros(shape=(self.Right_shape[1],1)), dtype=tf.float32, trainable=False)
-        row[0,0].assign(1)
+        row = np.zeros(shape=(self.Right_shape[1],1))
+        row[0,0]=1
+        row=tf.constant(row,dtype=tf.float32)
         for j in range(out_shape2):
             for k in range(self.kernel_size):
                 try:
@@ -206,9 +207,9 @@ class PaddingJacobiens(Layer):
             
         del new_line
         
-        col = tf.Variable(np.zeros(shape=(1,self.Right_shape[0])), dtype=tf.float32, trainable=False)
-        col[0,0].assign(1)
-        
+        col =np.zeros(shape=(1,self.Right_shape[0]))
+        col[0,0]=1
+        col=tf.constant(col, dtype=tf.float32)
         for i in range(out_shape1):
             for l in range(self.kernel_size):
                 try:
