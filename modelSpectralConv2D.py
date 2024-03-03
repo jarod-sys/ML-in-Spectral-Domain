@@ -15,7 +15,7 @@ class ModelSpectral(object):
     def __init__(self,
                  batch_size=200,
                  epochs=20,
-                 verbose=0,
+                 verbose=1,
                  learning_rate=0.03,
                  name_data="mnist",
                  strides=1,
@@ -41,11 +41,13 @@ class ModelSpectral(object):
         self.use_bias = use_bias
         self.spectral_config = spectral_config
 
-    def build_model(self, units=1000, *args):
+    def build_model(self, units=1000, Pad_Jacob=True,*args):
         self.model = tf.keras.Sequential()
         self.model.add(tf.keras.layers.Input(shape=(28, 28, 1), dtype=tf.float32))
-
-        self.model.add(PaddingJacobiens(kernel_size=self.kernel_size, strides=self.strides, padding=self.padding))
+        
+        if Pad_Jacob:
+            self.model.add(PaddingJacobiens(kernel_size=self.kernel_size, strides=self.strides, padding=self.padding))
+        
         self.model.add(SpecConv2D(filters=self.filters, kernel_size=self.kernel_size, use_lambda_in=True, use_bias=self.use_bias,
                        activation="relu"))
 

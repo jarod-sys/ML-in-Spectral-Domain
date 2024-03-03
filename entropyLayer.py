@@ -31,6 +31,7 @@ class EntropyLayer(Layer):
     @property
     def get_mask(self):
         return self.mask
+        
     def build_repartition(self,*args):
         if self.flux_in and not self.flux_out:
             self.residu=self.inputshape[-1]%self.units
@@ -83,6 +84,7 @@ class EntropyLayer(Layer):
                 count+=1
         else:
             raise NotImplemented
+        self.indices.sort()
     
                         
     def build(self, input_shape):
@@ -133,7 +135,6 @@ class EntropyLayer(Layer):
         indices=self.indices, values=self.w,
         dense_shape=(self.inputshape[-1],self.units)
         )
-        kernel=tf.sparse.reorder(kernel,name="kernel")
         
         kernel = tf.sparse.to_dense(kernel)
         if self.activity:
